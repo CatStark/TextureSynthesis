@@ -20,6 +20,7 @@ public:
     void GC(Mat &source);
     Mat graph_Cut(Mat& A, Mat& B, int overlap, int orientation);
     Mat addBlending(Mat &_patch, Mat &_template,Point center);
+    void circleDetection(Mat &img);
 
 
     std::vector<Patch> _patchesList;

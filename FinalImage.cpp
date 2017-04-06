@@ -24,6 +24,76 @@ FinalImage::FinalImage(Mat &img, int y_expand, int x_expand, int windowSize)
     cout << " ------------Output image created--------------" << endl;
 }
 
+void circleDetection(Mat& src)
+{
+    cv::Mat gray, canny;
+    /// Convert it to gray
+    cv::cvtColor( src, gray, CV_BGR2GRAY );
+
+    // compute canny (don't blur with that image quality!!)
+    cv::Canny(gray, canny, 200,20);
+    //cv::namedWindow("canny2"); cv::imshow("canny2", canny>0);
+
+
+    std::vector<cv::Vec3f> circles;
+
+    /// Apply the Hough Transform to find the circles
+    cv::HoughCircles( gray, circles, CV_HOUGH_GRADIENT, 1, src.rows/8, 100, 20, src.rows/5006, 0 );
+
+    /// Draw the circles detected
+    for( size_t i = 0; i < circles.size(); i++ ) 
+    {
+        Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+        int radius = cvRound(circles[i][2]);
+        cv::circle( src, center, 3, Scalar(0,255,255), -1);
+        cv::circle( src, center, radius, Scalar(0,0,255), 1 );
+    }
+
+    //compute distance transform:
+    cv::Mat dt;
+    cv::distanceTransform(255-(canny>0), dt, CV_DIST_L2 ,3);
+    cv::namedWindow("distance transform"); cv::imshow("distance transform", dt/255.0f);
+    cout << " there are " << circles.size() << " circles in the image " << endl;
+
+    // test for semi-circles:
+    float minInlierDist = 2.0f;
+    for( size_t i = 0; i < circles.size(); i++ ) 
+    {
+        // test inlier percentage:
+        // sample the circle and check for distance to the next edge
+        unsigned int counter = 0;
+        unsigned int inlier = 0;
+
+        Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+        int radius = cvRound(circles[i][2]);
+
+        // maximal distance of inlier might depend on the size of the circle
+        float maxInlierDist = radius/55.0f;
+        if(maxInlierDist < minInlierDist) maxInlierDist = minInlierDist;
+
+        //TODO: maybe paramter incrementation might depend on circle size!
+        for(float t =0; t<2*3.14159265359f; t+= 0.1f) 
+        {
+            counter++;
+            float cX = radius*cos(t) + circles[i][0];
+            float cY = radius*sin(t) + circles[i][1];
+
+            if(dt.at<float>(cY,cX) < maxInlierDist) 
+            {
+                inlier++;
+                cv::circle(src, cv::Point2i(cX,cY),3, cv::Scalar(0,255,0));
+            } 
+           else
+                cv::circle(src, cv::Point2i(cX,cY),3, cv::Scalar(255,0,0));
+        }
+        std::cout << 100.0f*(float)inlier/(float)counter << " % of a circle with radius " << radius << " detected" << std::endl;
+    }
+
+    cv::namedWindow("output"); cv::imshow("output", src);
+    cv::imwrite("houghLinesComputed.png", src);
+
+}
+
 Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
 {
 
@@ -228,9 +298,9 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
     }
 
     /*imwrite("graphcut.jpg", graphcut);
-    imwrite("graphcut_and_cut_line.jpg", graphcut_and_cutline);*/
+    imwrite("graphcut_and_cut_line.jpg", graphcut_and_cutline);
     imshow("graphcut and cut line", graphcut_and_cutline);
-    imshow("graphcut", graphcut);
+    imshow("graphcut", graphcut);*/
 
     //waitKey();
 
@@ -415,6 +485,7 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
     target.image = selectSubset(selectedTexture, target.width, target.height); //Create a smaller subset of the original image 
     Rect rect(0,0, target.width, target.height);
     target.image.copyTo(newimg(rect));
+     //_patchesList.resize(101);
     
     cout << "size: " << grid.grid[1].size() << endl;
     for (int patchesInY = 0; patchesInY < grid.grid[1].size(); patchesInY++)
@@ -425,35 +496,42 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
             selectedTexture = choseTypeTexture(img, img2, img3, patch, grid, patchesInX, patchesInY);
             
             //Start comparing patches (until error is lower than tolerance)
-            for (int i = 0; i < 500 ; i++) //This alue needs to be at least 50
-            {
-                //Set image to patch
-                patch.image = selectSubset(selectedTexture, patch.width, patch.height); //subselection from original texture
-      
-                //Create ROIs
-                patch.roiOfPatch = patch.image(Rect(0, 0, overlap, patch.height));
-                patch.roiOfTarget = target.image(Rect(offset, 0, overlap, target.height));
-                patch.halfOfTarget = target.image(Rect(target.width/4, 0, target.width-(target.width/4), target.height));
+            
+            //#pragma omp parallel for           
+            int k = 0;
+            //#pragma omp parallel 
+           // {
+            //#pragma omp for nowait
+                for (int i = 0; i < 500 ; i++) //This value needs to be at least 50
+                {          
+                   //Set image to patch
+                    patch.image = selectSubset(selectedTexture, patch.width, patch.height); //subselection from original texture
+          
+                    //Create ROIs
+                    patch.roiOfPatch = patch.image(Rect(0, 0, overlap, patch.height));
+                    patch.roiOfTarget = target.image(Rect(offset, 0, overlap, target.height));
+                    patch.halfOfTarget = target.image(Rect(target.width/4, 0, target.width-(target.width/4), target.height));
 
-                err = msqe(patch.roiOfTarget, patch.roiOfPatch); //Get MSQE
+                    err = msqe(patch.roiOfTarget, patch.roiOfPatch); //Get MSQE
 
-                if (patchesInY > 0) //if is the second or bigger row
-                {
-                    patch.roiOfTopPatch = patch.image(Rect(0, 0, patch.width, overlap));
-                    patch.roiOfBotTarget = newimg(Rect(posXPatch, posYPatch - overlap, patch.width, overlap));
-                 
-                    err += msqe(patch.roiOfTopPatch, patch.roiOfBotTarget);
-                    err = err/2; 
+                    if (patchesInY > 0) //if is the second or bigger row
+                    {
+                        patch.roiOfTopPatch = patch.image(Rect(0, 0, patch.width, overlap));
+                        patch.roiOfBotTarget = newimg(Rect(posXPatch, posYPatch - overlap, patch.width, overlap));
+                     
+                        err += msqe(patch.roiOfTopPatch, patch.roiOfBotTarget);
+                        err = err/2; 
+                    }
+                    patch.error = err;
+                    //_patchesList[k] = patch;
+                    _patchesList.push_back(patch);
+                    //k++;
+                    err = 0;
                 }
-
-                patch.error = err;
-                _patchesList.push_back(patch);
-                err = 0;
-            }
+           // }
 
             //chose random patch from best errors list
-            bestP = getRandomPatch(_patchesList);
-
+            bestP = getRandomPatch(_patchesList); 
             _newImg = newimg(Rect(0, posYPatch, posXPatch + overlap, bestP.image.rows)); //temporal target
             _newImg = graph_Cut( _newImg, bestP.image, overlap, 1);
             _newImg.copyTo(newimg(Rect(0, posYPatch, _newImg.cols, _newImg.rows)));
@@ -461,7 +539,7 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
             //Set new target, which is the best patch of this iteration       
             target.image = bestP.image;
             posXPatch += patch.width - overlap;
-            _patchesList.clear();
+            _patchesList.clear(); 
         }
         
         posXPatch = patch.width - overlap; //Update posision of X
@@ -481,7 +559,6 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
                 newTarget.error = err;
                 _patchesList.push_back(newTarget);
             }
-            cout << "y: " << patchesInY << endl;
             //chose best error
             bestP = getRandomPatch(_patchesList);
             newTarget.image = bestP.image;
@@ -514,7 +591,7 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
 
         //Apply GC
         gc = graph_Cut(_template, _patch, overlap, 2);
-        imshow("gc", gc);
+        //imshow("gc", gc);
         gc.copyTo(synthesised_Image(Rect(0,newTmpY, gc.cols, gc.rows)));
 
         //Apply blending
