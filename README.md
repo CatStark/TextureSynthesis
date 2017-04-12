@@ -5,5 +5,5 @@ Compile wth
 
 ```
 
-g++ `pkg-config --cflags opencv` -o textureSynthesis -g -lgomp -fopenmp main.cpp FinalImage.cpp Patch.cpp Grid.cpp graph.cpp maxflow.cpp Graph_Cut.cpp `pkg-config --libs opencv`
+g++ `pkg-config --cflags opencv` -o textureSynthesis -g -lgomp -fopenmp main.cpp FinalImage.cpp Patch.cpp Grid.cpp graph.cpp maxflow.cpp `pkg-config --libs opencv`
 
