@@ -96,9 +96,6 @@ void circleDetection(Mat& src)
 
 Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
 {
-
-
-
     assert(A.data);
     assert(B.data);
     if (orientation == 1)
@@ -126,14 +123,10 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
         yoffset = A.rows - overlap;
     }
 
-
     Mat no_graphcut(_rows, _cols, A.type() );
     A.copyTo(no_graphcut(Rect(0, 0, A.cols, A.rows)));
     B.copyTo(no_graphcut(Rect(xoffset, yoffset, B.cols, B.rows)));
-    imshow("no graphcut ", no_graphcut);
-    
 
-    
     int est_nodes;
     if (orientation == 1)      
         est_nodes = A.rows * overlap;
@@ -149,13 +142,16 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
 
     if (orientation == 1)
     {
+
         // Set the source/sink weights
+        #pragma omp for 
         for(int y=0; y < A.rows; y++) {
             g.add_tweights(y*overlap + 0, INT_MAX, 0);
             g.add_tweights(y*overlap + overlap-1, 0, INT_MAX);
         }
 
         // Set edge weights
+        #pragma omp parallel for
         for(int y=0; y < A.rows; y++) { //Change this 
             for(int x=0; x < overlap; x++) {
                 int idx = y*overlap + x;
@@ -170,7 +166,7 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
                     Vec3b b1 = B.at<Vec3b>(y, x + 1);
 
                     double cap1 = norm(a1, b1);
-
+                    #pragma omp critical
                     g.add_edge(idx, idx + 1, (int)(cap0 + cap1), (int)(cap0 + cap1));
                 }
 
@@ -180,7 +176,7 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
                     Vec3b b2 = B.at<Vec3b>(y+1, x);
 
                     double cap2 = norm(a2, b2);
-
+                    #pragma omp critical
                     g.add_edge(idx, idx + overlap, (int)(cap0 + cap2), (int)(cap0 + cap2));
                 }
             }
@@ -193,6 +189,8 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
             g.add_tweights(x*overlap + 0, INT_MAX, 0); // Add the Terminal nodes 
             g.add_tweights(x*overlap + overlap - 1, 0, INT_MAX);
         }
+
+        #pragma omp parallel for collapse(2)
         for(int x=0; x < A.cols; x++) {
             for( int y=0; y < overlap; y++)  {
                 int idx = x*overlap + y;
@@ -200,13 +198,13 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
                 Vec3b a0 = A.at<Vec3b>(y, xoffset + x);
                 Vec3b b0 = B.at<Vec3b>(y, x);
                 double cap0 = norm(a0, b0);
-
                 
                  // Add bottom edge
                 if(y+1 < overlap) {
                     Vec3b a1 = A.at<Vec3b>(yoffset + y + 1, x);
                     Vec3b b1 = B.at<Vec3b>(y + 1,x);
                     double cap1 = norm(a1, b1);
+                    #pragma omp critical
                     g.add_edge(idx, idx + 1, (int)(cap0 + cap1), (int)(cap0 + cap1));
                 }
 
@@ -215,10 +213,10 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
                     Vec3b a2 = A.at<Vec3b>(yoffset + y, x+1);
                     Vec3b b2 = B.at<Vec3b>(y, x+1);
                     double cap2 = norm(a2, b2);
+                    #pragma omp critical
                     g.add_edge(idx, idx + overlap, (int)(cap0 + cap2), (int)(cap0 + cap2));
                 }
-            }
-             
+            }     
         }
     }
     
@@ -231,6 +229,7 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
     int idx = 0;
     if (orientation == 1)
     {
+
         for(int y=0; y < A.rows; y++) {
             for(int x=0; x < overlap; x++) {
                 if(g.what_segment(idx) == GraphType::SOURCE) {
@@ -241,22 +240,6 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
                 }
                 graphcut_and_cutline.at<Vec3b>(y, xoffset + x) =  graphcut.at<Vec3b>(y, xoffset + x);
 
-                // Draw the cut
-                if(x+1 < overlap) {
-                    if(g.what_segment(idx) != g.what_segment(idx+1)) {
-                        graphcut_and_cutline.at<Vec3b>(y, xoffset + x) = Vec3b(0,255,0);
-                        graphcut_and_cutline.at<Vec3b>(y, xoffset + x + 1) = Vec3b(0,255,0);
-                        graphcut_and_cutline.at<Vec3b>(y, xoffset + x - 1) = Vec3b(0,255,0);
-                    }
-                }
-                // Draw the cut
-                if(y > 0 && y+1 < A.rows) {
-                    if(g.what_segment(idx) != g.what_segment(idx + overlap)) {
-                        graphcut_and_cutline.at<Vec3b>(y-1, xoffset + x) = Vec3b(0,255,0);
-                        graphcut_and_cutline.at<Vec3b>(y, xoffset + x) = Vec3b(0,255,0);
-                        graphcut_and_cutline.at<Vec3b>(y+1, xoffset + x) = Vec3b(0,255,0);
-                    }
-                }
                 idx++;
             }
         }  
@@ -273,37 +256,13 @@ Mat FinalImage::graph_Cut(Mat& A, Mat& B, int overlap, int orientation)
                     graphcut.at<Vec3b>(yoffset + y, x) = B.at<Vec3b>(y, x);
                 }
                 graphcut_and_cutline.at<Vec3b>(yoffset + y,  x) =  graphcut.at<Vec3b>(yoffset + y, x);
-
-                // Draw the cut
-                if(y+1 < overlap) {
-                    if(g.what_segment(idx) != g.what_segment(idx+1)) {
-                        graphcut_and_cutline.at<Vec3b>(yoffset + y, x) = Vec3b(0,0255,0);
-                        graphcut_and_cutline.at<Vec3b>(yoffset + y + 1, x) = Vec3b(0,255,0);
-                        graphcut_and_cutline.at<Vec3b>(yoffset + y - 1, x) = Vec3b(0,255,0);
-                    }
-                }
-
-                // Draw the cut
-                //if(y > 0 && y+1 < A.rows) {
-                if(x > 0 && x+1 < A.cols) {
-                    if(g.what_segment(idx) != g.what_segment(idx + overlap)) {
-                        graphcut_and_cutline.at<Vec3b>(yoffset + y, x-1) = Vec3b(0,255,0);
-                        graphcut_and_cutline.at<Vec3b>(yoffset + y, x) = Vec3b(0,255,0);
-                        graphcut_and_cutline.at<Vec3b>(yoffset + y, x+1) = Vec3b(0,255,0);
-                    }
-                }
                 idx++;
             }
         }
     }
 
-    /*imwrite("graphcut.jpg", graphcut);
-    imwrite("graphcut_and_cut_line.jpg", graphcut_and_cutline);
     imshow("graphcut and cut line", graphcut_and_cutline);
-    imshow("graphcut", graphcut);*/
-
-    //waitKey();
-
+    imshow("graphcut", graphcut);
     return graphcut;
 }
 
@@ -311,8 +270,8 @@ Mat FinalImage::selectSubset(Mat &originalImg, int width_patch, int height_patch
 {
     //copy a sub matrix of X to Y with starting coodinate (startX,startY)
     // and dimension (cols,rows)
-    int startX = rand() % (originalImg.cols - width_patch);
-    int startY = rand() % (originalImg.rows - height_patch);
+    int startX = rand_r(&seed)% (originalImg.cols - (width_patch + 10));
+    int startY = rand_r(&seed)% (originalImg.rows - (height_patch + 10));
     Mat tmp = originalImg(cv::Rect(startX, startY, width_patch, height_patch)); 
     Mat subset;
     tmp.copyTo(subset);
@@ -439,7 +398,6 @@ Mat FinalImage::choseTypeTexture(Mat &img, Mat &img2, Mat &img3, Patch &p, Grid 
     }   
 }
 
-
 Mat FinalImage::addBlending(Mat &_patch, Mat &_template, Point center)
 {
     Mat src = _patch;
@@ -448,7 +406,6 @@ Mat FinalImage::addBlending(Mat &_patch, Mat &_template, Point center)
     Mat src_mask = 255 * Mat::ones(src.rows, src.cols, src.depth());
     Mat normal_clone;
     seamlessClone(src, dst, src_mask, center, normal_clone, NORMAL_CLONE); 
-    //circle( normal_clone, center, 5.0, Scalar( 0, 50, 255 ), 1, 8 );
     return normal_clone;
 }
 
@@ -487,49 +444,58 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
     target.image.copyTo(newimg(rect));
      //_patchesList.resize(101);
     
-    cout << "size: " << grid.grid[1].size() << endl;
     for (int patchesInY = 0; patchesInY < grid.grid[1].size(); patchesInY++)
    {
         for (int patchesInX = 1; patchesInX < grid.grid.size(); patchesInX++) 
         {    
             //Choose texture background or foreground 
             selectedTexture = choseTypeTexture(img, img2, img3, patch, grid, patchesInX, patchesInY);
+           
+            //seed to get random patch from input
+            seed = omp_get_thread_num();
             
-            //Start comparing patches (until error is lower than tolerance)
-            
-            //#pragma omp parallel for           
-            int k = 0;
-            //#pragma omp parallel 
-           // {
-            //#pragma omp for nowait
-                for (int i = 0; i < 500 ; i++) //This value needs to be at least 50
+            ///Start comparing patches (until error is lower than tolerance)  
+            #pragma omp parallel
+            { 
+                //Private objects to parallelize
+                std::vector<Patch> _patchesList_private;
+                Patch _patch(img); 
+
+               #pragma omp for 
+                for (int i = 0; i < 60 ; i++) //This value needs to be at least 50
                 {          
                    //Set image to patch
-                    patch.image = selectSubset(selectedTexture, patch.width, patch.height); //subselection from original texture
+                    _patch.image = selectSubset(selectedTexture, patch.width, patch.height); //subselection from original texture
           
                     //Create ROIs
-                    patch.roiOfPatch = patch.image(Rect(0, 0, overlap, patch.height));
-                    patch.roiOfTarget = target.image(Rect(offset, 0, overlap, target.height));
-                    patch.halfOfTarget = target.image(Rect(target.width/4, 0, target.width-(target.width/4), target.height));
+                    _patch.roiOfPatch = _patch.image(Rect(0, 0, overlap, _patch.height));
+                    _patch.roiOfTarget = target.image(Rect(offset, 0, overlap, target.height));
+                    _patch.halfOfTarget = target.image(Rect(target.width/4, 0, target.width-(target.width/4), target.height));
 
-                    err = msqe(patch.roiOfTarget, patch.roiOfPatch); //Get MSQE
+                    //Get MSQE
+                    err = msqe(_patch.roiOfTarget, _patch.roiOfPatch); 
 
-                    if (patchesInY > 0) //if is the second or bigger row
+                    //if is the second or bigger row
+                    if (patchesInY > 0) 
                     {
-                        patch.roiOfTopPatch = patch.image(Rect(0, 0, patch.width, overlap));
-                        patch.roiOfBotTarget = newimg(Rect(posXPatch, posYPatch - overlap, patch.width, overlap));
-                     
-                        err += msqe(patch.roiOfTopPatch, patch.roiOfBotTarget);
+                        _patch.roiOfTopPatch = _patch.image(Rect(0, 0, _patch.width, overlap));
+                        _patch.roiOfBotTarget = newimg(Rect(posXPatch, posYPatch - overlap, _patch.width, overlap));
+                        err += msqe(_patch.roiOfTopPatch, _patch.roiOfBotTarget);
                         err = err/2; 
                     }
-                    patch.error = err;
-                    //_patchesList[k] = patch;
-                    _patchesList.push_back(patch);
-                    //k++;
+
+                    //Set values to patch
+                    _patch.error = err;
+                    _patchesList_private.push_back(_patch); 
+
+                    //Reset error for next iteration
                     err = 0;
                 }
-           // }
-
+                //Join parallel vectors
+                #pragma omp critical
+                _patchesList.insert(_patchesList.end(), _patchesList_private.begin(), _patchesList_private.end());
+            }
+  
             //chose random patch from best errors list
             bestP = getRandomPatch(_patchesList); 
             _newImg = newimg(Rect(0, posYPatch, posXPatch + overlap, bestP.image.rows)); //temporal target
@@ -540,17 +506,16 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
             target.image = bestP.image;
             posXPatch += patch.width - overlap;
             _patchesList.clear(); 
-        }
-        
+        }   
+
+
         posXPatch = patch.width - overlap; //Update posision of X
         posYPatch += patch.height;//New patch of the next row (which is the new first target)
         newTarget.roiOfBotTarget = newimg(Rect(0, posYPatch - overlap , patch.width, overlap));
-
         if (patchesInY + 1 != grid.grid[1].size())
         {
             for (int i = 0; i < 100; i++)
             {
-                //selectedTexture = choseTypeTexture(img, img2, patch, grid, 0, patchesInY+1);
                 newTarget.image = selectSubset(img, newTarget.width, newTarget.height); //subselection from original texture            
                 //Create ROIs
                 newTarget.roiOfTopPatch = newTarget.image(Rect(0, 0, newTarget.width, overlap));   
@@ -568,7 +533,6 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
         }
         
     }
-
     posYPatch = 0;
     posXPatch = patch.width - overlap;
     int widht_Final_image = newimg.cols - overlap * 2;
@@ -577,12 +541,13 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
 
     synthesised_Image = Mat::zeros(newimg.rows, widht_Final_image, CV_64FC3);
     synthesised_Image.convertTo(synthesised_Image, CV_8UC1);
-    
     _template = newimg(Rect(0,posYPatch, widht_Final_image, patch.height));
     _patch = newimg(Rect(0,posYPatch + patch.height, widht_Final_image, patch.height)); 
     
+    //#pragma omp parallel for 
     for (int patchesInY = 0; patchesInY <grid.grid[1].size()-1 ; patchesInY++)
     {
+        //cout << "threads " << omp_get_num_threads() << endl;
         if (patchesInY != 0)
         {
             _template = synthesised_Image(Rect(0,posYPatch - (overlap * patchesInY), widht_Final_image, patch.height));

@@ -36,6 +36,7 @@ public:
     int width, height;
     int backgroundPorcentageTmp;
     int gridSize, gridX, gridY;
+    unsigned int seed;
 private:
 };
 

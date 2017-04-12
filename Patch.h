@@ -17,6 +17,7 @@
 #include <cassert>
 #include <vector>
 #include <iostream>
+#include <stdlib.h>
 
 
 using namespace cv;

@@ -12,6 +12,7 @@ Grid::Grid(int x, int y) //Constructor
 //Fill the grid with random values
 void Grid::fill(int backgroundPercentage)
 {
+	#pragma omp for 
 	for (int j = 0; j < grid[1].size() ; j++){
 		for (int i = 0; i < grid.size(); i++){
 			double start = rand() % 255;
@@ -34,6 +35,7 @@ void Grid::mapGeneration(int backgroundPercentage)
 	//0 is background 1 is details
 	int flag = sortedList.size()/(backgroundPercentage/10);
 	flag = sortedList[flag];
+	#pragma omp for 
 	for (int j = 0; j < grid[1].size() ; j++){
 		for (int i = 0; i < grid.size(); i++){
 			if (grid[i][j] > flag)
