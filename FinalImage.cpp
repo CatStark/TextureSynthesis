@@ -435,7 +435,7 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
 
     //Create grid with random distribution for either background or texture
     Grid grid(gridX, gridY); 
-    grid.fill(backgroundPorcentage); 
+    grid.fill(backgroundPorcentage, detailsPorcentage); 
 
     //Create first target
     selectedTexture = choseTypeTexture(img, img2, img3, patch, grid, 0,0); 

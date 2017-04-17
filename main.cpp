@@ -3,6 +3,7 @@
 #include <iostream>
 #include <math.h>
 #include <algorithm>
+#include <sys/time.h>
 
 
 #define ATD at<double>
@@ -11,8 +12,11 @@
 int main( int argc, char** argv ){
 
     int option = 0;
-    long start, end;
-    start = clock();
+
+    struct timeval start, end;
+    double delta;
+    
+
     srand(time(NULL)); //Seed to get randmon patches
     
     // Create empty output image.
@@ -25,7 +29,7 @@ int main( int argc, char** argv ){
     //Load input images
     //img = imread("Moon.jpg");
     InputImg = imread("Textures/AST3.jpg");
-    InputImg2 = imread("Textures/AST1.jpg");
+    InputImg2 = imread("Textures/AST2.jpg");
     InputImg3 = imread("Textures/AST1.jpg");
 
     inputSamples.push_back(InputImg);
@@ -55,10 +59,10 @@ int main( int argc, char** argv ){
     {
         cout << "How much porcentage you want to give to the Background (0 - 100) " << endl;
         //cin >> backgroundPorcentage;
-        backgroundPorcentage = 70; //hardcoded just for debugging 
+        backgroundPorcentage = 50; //hardcoded just for debugging 
         cout << "How much porcentage you want to give to the details ( 0 - 100) " << endl;
         //cin >> detailsPorcentage;
-        detailsPorcentage = 30;
+        detailsPorcentage = 50;
         //TODO verification that background and details sums to 100%
         
         for (int i = 0; i< inputSamples.size(); i++)
@@ -80,17 +84,21 @@ int main( int argc, char** argv ){
                 }
             }
         }
-        
+        gettimeofday(&start, NULL);
         result = _finalImage.textureSynthesis(_patch, _target, InputImg, InputImg2, InputImg3, backgroundPorcentage, detailsPorcentage);
     }
    /* else if (option == 3)
         result = img;*/
     result.convertTo(result, CV_8UC1);
+    imwrite("final.jpg", result);
     imshow("Final", result);
     //imshow("img", img);
 
-    end = clock();
-    cout<<"used time: "<<((double)(end - start)) / CLOCKS_PER_SEC<<" second"<<endl;
+
+    gettimeofday(&end, NULL);
+
+    delta = ((end.tv_sec  - start.tv_sec) * 1000000u + end.tv_usec - start.tv_usec) / 1.e6;
+    cout<<"used time: "<< delta  << " second"<<endl;
     
     waitKey(0);
     return 0;

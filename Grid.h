@@ -10,8 +10,9 @@ class Grid
 public:
     Grid(int x , int y); //Constructor
     vector< vector<int> > grid;
-    void fill(int);
-    void mapGeneration(int);
+    void fill(int backgroundPercentage, int detailsPercentage);
+    void getAverageOfGrid();
+    void mapGeneration(int backgroundPercentage, int detailsPercentage);
     vector<int> sortedList; //sorted list of the heightmap
 
 private:
