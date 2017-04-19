@@ -10,6 +10,7 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/photo.hpp"
 #include "opencv2/imgcodecs.hpp"
+#include "opencv2/video/tracking.hpp"
 #include "maxflow/graph.h"
 #include <utility>
 

@@ -24,6 +24,7 @@ FinalImage::FinalImage(Mat &img, int y_expand, int x_expand, int windowSize)
     cout << " ------------Output image created--------------" << endl;
 }
 
+
 void circleDetection(Mat& src)
 {
     cv::Mat gray, canny;
@@ -571,8 +572,6 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
 
         posYPatch += patch.height;
         newTmpY += patch.height - overlap;
-        //imshow("_template", _template);
-        //imshow("_patch", _patch);
         imwrite("patch.jpg", _patch);
         imwrite("template.jpg", _template);
         

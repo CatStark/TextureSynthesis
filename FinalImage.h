@@ -23,6 +23,7 @@ public:
     bool circleComplete(Mat &img);
 
 
+
     std::vector<Patch> _patchesList;
     _patches tmpPatch;
     int posYTarget, posYPatch, posXPatch;

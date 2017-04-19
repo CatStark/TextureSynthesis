@@ -9,14 +9,103 @@
 #define ATD at<double>
 #define elif else if
 
-int main( int argc, char** argv ){
+Mat src,img,ROI;
+Rect cropRect(0,0,0,0);
+ Point P1(0,0);
+ Point P2(0,0);
 
-    int option = 0;
+const char* winName="Crop Image";
+bool clicked=false;
+int i=0;
+char imgName[15];
+std::vector<string> input_Name;
+string temp;
 
+
+void checkBoundary(){
+       //check croping rectangle exceed image boundary
+       if(cropRect.width>img.cols-cropRect.x)
+         cropRect.width=img.cols-cropRect.x;
+
+       if(cropRect.height>img.rows-cropRect.y)
+         cropRect.height=img.rows-cropRect.y;
+
+        if(cropRect.x<0)
+         cropRect.x=0;
+
+       if(cropRect.y<0)
+         cropRect.height=0;
+}
+
+Mat showImage(){
+    img=src.clone();
+    checkBoundary();
+    if(cropRect.width>0&&cropRect.height>0){
+        ROI=src(cropRect);
+        imshow("cropped",ROI);
+    }
+    rectangle(img, cropRect, Scalar(0,255,0), 1, 8, 0 );
+    imshow(winName,img);
+    return ROI;
+}
+
+void onMouse( int event, int x, int y, int f, void* )
+{
+
+
+    switch(event){
+
+        case  CV_EVENT_LBUTTONDOWN  :
+                                        clicked=true;
+
+                                        P1.x=x;
+                                        P1.y=y;
+                                        P2.x=x;
+                                        P2.y=y;
+                                        break;
+
+        case  CV_EVENT_LBUTTONUP    :
+                                        P2.x=x;
+                                        P2.y=y;
+                                        clicked=false;
+                                        break;
+
+        case  CV_EVENT_MOUSEMOVE    :
+                                        if(clicked){
+                                        P2.x=x;
+                                        P2.y=y;
+                                        }
+                                        break;
+
+        default                     :   break;
+
+
+    }
+
+
+    if(clicked){
+     if(P1.x>P2.x){ cropRect.x=P2.x;
+                       cropRect.width=P1.x-P2.x; }
+        else {         cropRect.x=P1.x;
+                       cropRect.width=P2.x-P1.x; }
+
+        if(P1.y>P2.y){ cropRect.y=P2.y;
+                       cropRect.height=P1.y-P2.y; }
+        else {         cropRect.y=P1.y;
+                       cropRect.height=P2.y-P1.y; }
+
+    }
+
+
+showImage();
+}
+
+int main( int argc, char** argv )
+{
+
+    int option, number_of_Inputs = 0;
     struct timeval start, end;
     double delta;
-    
-
     srand(time(NULL)); //Seed to get randmon patches
     
     // Create empty output image.
@@ -25,16 +114,67 @@ int main( int argc, char** argv ){
     Mat InputImg3;
     Mat result;
     std::vector<Mat> inputSamples;
-    
-    //Load input images
-    //img = imread("Moon.jpg");
+    std::vector<Mat> InputImg_;
+
+    //Background
     InputImg = imread("Textures/AST3.jpg");
-    InputImg2 = imread("Textures/AST2.jpg");
-    InputImg3 = imread("Textures/AST1.jpg");
+    //Details
+        InputImg2 = imread("Textures/AST2.jpg");
+        InputImg3 = imread("Textures/AST1.jpg");
+
+
+    //Feauture perservation
+    char response;
+    cout<<"Do you want to specify the features manually? Y/n"<<endl<<endl;
+    cin >> response;
+    
+    if (response == 'y')
+    {
+        cout<<"Click and drag for Selection"<<endl<<endl;
+        cout<<"------> Press 's' to save"<<endl<<endl;
+        cout<<"------> Press 'r' to reset"<<endl;
+        cout<<"------> Press 'Esc' to quit"<<endl<<endl;
+    
+
+        for (int i = 0; i < 2; i++)
+        {
+            if ( i == 0)
+                src=InputImg2;
+            else
+                src=InputImg3;
+            namedWindow(winName,WINDOW_NORMAL);
+            setMouseCallback(winName,onMouse,NULL );
+            imshow(winName, src);    
+            while(1){
+              char c=waitKey();
+              if(c=='s'&&ROI.data)
+              {
+                sprintf(imgName,"%d.jpg",i++);
+                imwrite(imgName,ROI);
+                cout<<"  Saved "<<imgName<<endl;
+              }
+              if(c==27) break;
+              if(c=='r') {cropRect.x=0;cropRect.y=0;cropRect.width=0;cropRect.height=0;}
+              ROI = showImage();
+              //imshow("cropped",ROI);
+            }
+            destroyAllWindows();
+
+            if (i == 0)
+                InputImg2 = ROI;
+            else 
+                InputImg3 = ROI;
+        }
+    }
+    
+    
+   // InputImg2 = imread(inputSamples[0]);
 
     inputSamples.push_back(InputImg);
     inputSamples.push_back(InputImg2);
     inputSamples.push_back(InputImg3);
+
+    
 
     int backgroundPorcentage, detailsPorcentage = 0; 
     std::vector<int> lightVector; //From where is the light coming 1) Left 2)Up 3)Right 4)Down
