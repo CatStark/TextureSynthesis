@@ -104,6 +104,7 @@ int main( int argc, char** argv )
 {
 
     int option, number_of_Inputs = 0;
+    int mode = 0; //0 = no user interaction for feauture perservation, 1 = user interaction for feauture perservation 
     struct timeval start, end;
     double delta;
     srand(time(NULL)); //Seed to get randmon patches
@@ -130,6 +131,7 @@ int main( int argc, char** argv )
     
     if (response == 'y')
     {
+        mode = 1;
         cout<<"Click and drag for Selection"<<endl<<endl;
         cout<<"------> Press 's' to save"<<endl<<endl;
         cout<<"------> Press 'r' to reset"<<endl;
@@ -167,14 +169,9 @@ int main( int argc, char** argv )
         }
     }
     
-    
-   // InputImg2 = imread(inputSamples[0]);
-
     inputSamples.push_back(InputImg);
     inputSamples.push_back(InputImg2);
     inputSamples.push_back(InputImg3);
-
-    
 
     int backgroundPorcentage, detailsPorcentage = 0; 
     std::vector<int> lightVector; //From where is the light coming 1) Left 2)Up 3)Right 4)Down
@@ -225,7 +222,7 @@ int main( int argc, char** argv )
             }
         }
         gettimeofday(&start, NULL);
-        result = _finalImage.textureSynthesis(_patch, _target, InputImg, InputImg2, InputImg3, backgroundPorcentage, detailsPorcentage);
+        result = _finalImage.textureSynthesis(_patch, _target, InputImg, InputImg2, InputImg3, backgroundPorcentage, detailsPorcentage,  mode);
     }
    /* else if (option == 3)
         result = img;*/

@@ -42,6 +42,7 @@ public:
 	double error; 
 	int typeOfTexture; //Type of texture; 1) background or 2) detail
 	int lightDirection;
+	int mode; //mode for feauture perservation. 0 = no user interaction, 1 = user interaction
 	
 private:
 };

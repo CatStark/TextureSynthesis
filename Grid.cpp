@@ -94,13 +94,13 @@ void Grid::mapGeneration(int backgroundPercentage, int detailsPercentage)
 {
 	//we run through each cell again and if it's less than the cell average the cell is type A or type B
 	//double flag = sortedList.size() * (backgroundPercentage/100);
-	double flag = sortedList.size() * .80;
+	double flag = sortedList.size() * .90;
 	flag = sortedList[flag];
 	for (int j = 0; j < grid[1].size() ; j++){
 		for (int i = 0; i < grid.size(); i++){
 			if (grid[i][j] < flag)
 				grid[i][j] = 0;
-			else if (grid[i][j] >= flag && grid[i][j] <= flag + (sortedList.size() * .20))
+			else if (grid[i][j] >= flag && grid[i][j] <= flag + (sortedList.size() * .10))
 				grid[i][j] = 1;
 			else
 				grid[i][j] = 2;

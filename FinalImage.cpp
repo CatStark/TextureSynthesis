@@ -24,7 +24,6 @@ FinalImage::FinalImage(Mat &img, int y_expand, int x_expand, int windowSize)
     cout << " ------------Output image created--------------" << endl;
 }
 
-
 void circleDetection(Mat& src)
 {
     cv::Mat gray, canny;
@@ -410,11 +409,10 @@ Mat FinalImage::addBlending(Mat &_patch, Mat &_template, Point center)
     return normal_clone;
 }
 
-Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2, Mat &img3, int backgroundPorcentage, int detailsPorcentage)
+Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2, Mat &img3, int backgroundPorcentage, int detailsPorcentage, int mode)
 {
     Patch newTarget(img); //Target
     Patch bestP(img);     //Patch
-
     Point center;
 
     //Mats for cloning
@@ -441,6 +439,7 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
     //Create first target
     selectedTexture = choseTypeTexture(img, img2, img3, patch, grid, 0,0); 
     target.image = selectSubset(selectedTexture, target.width, target.height); //Create a smaller subset of the original image 
+    //cout << "size targe" << patch.image.size();
     Rect rect(0,0, target.width, target.height);
     target.image.copyTo(newimg(rect));
      //_patchesList.resize(101);
@@ -451,54 +450,61 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
         {    
             //Choose texture background or foreground 
             selectedTexture = choseTypeTexture(img, img2, img3, patch, grid, patchesInX, patchesInY);
+            if (mode == 0 || (mode == 1 && patch.typeOfTexture == 0))
+            {
            
-            //seed to get random patch from input
-            seed = omp_get_thread_num();
-            
-            ///Start comparing patches (until error is lower than tolerance)  
-            #pragma omp parallel
-            { 
-                //Private objects to parallelize
-                std::vector<Patch> _patchesList_private;
-                Patch _patch(img); 
+                //seed to get random patch from input
+                seed = omp_get_thread_num();
+                
+                ///Start comparing patches (until error is lower than tolerance)  
+                #pragma omp parallel
+                { 
+                    //Private objects to parallelize
+                    std::vector<Patch> _patchesList_private;
+                    Patch _patch(img); 
 
-               #pragma omp for 
-                for (int i = 0; i < 60 ; i++) //This value needs to be at least 50
-                {          
-                   //Set image to patch
-                    _patch.image = selectSubset(selectedTexture, patch.width, patch.height); //subselection from original texture
-          
-                    //Create ROIs
-                    _patch.roiOfPatch = _patch.image(Rect(0, 0, overlap, _patch.height));
-                    _patch.roiOfTarget = target.image(Rect(offset, 0, overlap, target.height));
-                    _patch.halfOfTarget = target.image(Rect(target.width/4, 0, target.width-(target.width/4), target.height));
+                   #pragma omp for 
+                    for (int i = 0; i < 60 ; i++) //This value needs to be at least 50
+                    {          
+                       //Set image to patch
+                        _patch.image = selectSubset(selectedTexture, patch.width, patch.height); //subselection from original texture
+              
+                        //Create ROIs
+                        _patch.roiOfPatch = _patch.image(Rect(0, 0, overlap, _patch.height));
+                        _patch.roiOfTarget = target.image(Rect(offset, 0, overlap, target.height));
+                        _patch.halfOfTarget = target.image(Rect(target.width/4, 0, target.width-(target.width/4), target.height));
 
-                    //Get MSQE
-                    err = msqe(_patch.roiOfTarget, _patch.roiOfPatch); 
+                        //Get MSQE
+                        err = msqe(_patch.roiOfTarget, _patch.roiOfPatch); 
 
-                    //if is the second or bigger row
-                    if (patchesInY > 0) 
-                    {
-                        _patch.roiOfTopPatch = _patch.image(Rect(0, 0, _patch.width, overlap));
-                        _patch.roiOfBotTarget = newimg(Rect(posXPatch, posYPatch - overlap, _patch.width, overlap));
-                        err += msqe(_patch.roiOfTopPatch, _patch.roiOfBotTarget);
-                        err = err/2; 
+                        //if is the second or bigger row
+                        if (patchesInY > 0) 
+                        {
+                            _patch.roiOfTopPatch = _patch.image(Rect(0, 0, _patch.width, overlap));
+                            _patch.roiOfBotTarget = newimg(Rect(posXPatch, posYPatch - overlap, _patch.width, overlap));
+                            err += msqe(_patch.roiOfTopPatch, _patch.roiOfBotTarget);
+                            err = err/2; 
+                        }
+
+                        //Set values to patch
+                        _patch.error = err;
+                        _patchesList_private.push_back(_patch); 
+
+                        //Reset error for next iteration
+                        err = 0;
                     }
-
-                    //Set values to patch
-                    _patch.error = err;
-                    _patchesList_private.push_back(_patch); 
-
-                    //Reset error for next iteration
-                    err = 0;
+                    //Join parallel vectors
+                    #pragma omp critical
+                    _patchesList.insert(_patchesList.end(), _patchesList_private.begin(), _patchesList_private.end());
                 }
-                //Join parallel vectors
-                #pragma omp critical
-                _patchesList.insert(_patchesList.end(), _patchesList_private.begin(), _patchesList_private.end());
+                //chose random patch from best errors list
+                bestP = getRandomPatch(_patchesList); 
             }
-  
+           else if (mode == 1 && patch.typeOfTexture != 0)
+            {
+                resize(selectedTexture,bestP.image, target.image.size());//resize image
+            }
             //chose random patch from best errors list
-            bestP = getRandomPatch(_patchesList); 
             _newImg = newimg(Rect(0, posYPatch, posXPatch + overlap, bestP.image.rows)); //temporal target
             _newImg = graph_Cut( _newImg, bestP.image, overlap, 1);
             _newImg.copyTo(newimg(Rect(0, posYPatch, _newImg.cols, _newImg.rows)));
@@ -572,6 +578,8 @@ Mat FinalImage::textureSynthesis(Patch patch, Patch target, Mat &img, Mat &img2,
 
         posYPatch += patch.height;
         newTmpY += patch.height - overlap;
+        //imshow("_template", _template);
+        //imshow("_patch", _patch);
         imwrite("patch.jpg", _patch);
         imwrite("template.jpg", _template);
         
