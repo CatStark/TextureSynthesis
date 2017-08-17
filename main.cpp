@@ -1,3 +1,9 @@
+/* Susana M. Guzmán
+Master Thesis 
+Universität Bremen
+*/
+
+
 #include "FinalImage.h"
 
 #include <iostream>
